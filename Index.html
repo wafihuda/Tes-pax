@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Generator Paxsenix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1"
+      }
+    }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(20, 184, 166, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(20, 184, 166, 0.9); }
+        }
+        .animate-glow { animation: pulse-glow 2s infinite; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { Loader2, Zap, Video, Download, Image as ImageIcon } from 'lucide-react';
+
+        // --- API KEY (Ganti ini kalau kuota habis) ---
+        const API_KEY_PAX = "sk-paxsenix-TUZDN7hP8-JUJ8qy7Jfeu8Ogl5Ki_2tnXmPrJNN6ZDV7vDaL"; 
+        
+        const ENDPOINT_IMAGE = "https://api.paxsenix.biz.id/ai/flux";
+        const ENDPOINT_VIDEO = "https://api.paxsenix.biz.id/ai/image-to-video";
+        const PROXY = "https://corsproxy.io/?";
+
+        function App() {
+            const [prompt, setPrompt] = useState("");
+            const [imgUrl, setImgUrl] = useState(null);
+            const [vidUrl, setVidUrl] = useState(null);
+            const [loadingImg, setLoadingImg] = useState(false);
+            const [loadingVid, setLoadingVid] = useState(false);
+
+            // Fungsi Pintar buat Nembus Blokir
+            const callApi = async (url, bodyData) => {
+                // Coba langsung dulu
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY_PAX}` },
+                        body: JSON.stringify(bodyData)
+                    });
+                    if (res.ok) return await res.json();
+                } catch(e) {}
+
+                // Kalau gagal, coba lewat jalur belakang (Proxy)
+                try {
+                    const target = PROXY + encodeURIComponent(url);
+                    const res = await fetch(target, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY_PAX}` },
+                        body: JSON.stringify(bodyData)
+                    });
+                    if (res.ok) return await res.json();
+                } catch(e) {}
+                
+                throw new Error("Gagal koneksi. Coba lagi nanti.");
+            };
+
+            const generateImage = async () => {
+                if(!prompt) return alert("Tulis deskripsi dulu!");
+                setLoadingImg(true);
+                setImgUrl(null);
+                setVidUrl(null);
+
+                try {
+                    const data = await callApi(ENDPOINT_IMAGE, { 
+                        prompt: `Professional cinematic shot of ${prompt}, 8k, photorealistic, commercial style, 9:16 aspect ratio` 
+                    });
+                    const result = data.url || data.imageUrl || data.result;
+                    if(result) setImgUrl(result);
+                    else alert("Gagal bikin gambar. Cek kuota.");
+                } catch(e) { alert(e.message); }
+                setLoadingImg(false);
+            };
+
+            const generateVideo = async () => {
+                if(!imgUrl) return;
+                setLoadingVid(true);
+                try {
+                    const data = await callApi(ENDPOINT_VIDEO, {
+                        url: imgUrl,
+                        prompt: "cinematic slow pan, smooth motion",
+                        motion_bucket_id: 127
+                    });
+                    const result = data.url || data.result?.url || (typeof data.result === 'string' ? data.result : null);
+                    if(result) setVidUrl(result);
+                    else alert("Gagal bikin video. Coba lagi.");
+                } catch(e) { alert(e.message); }
+                setLoadingVid(false);
+            };
+
+            return (
+                <div className="max-w-md mx-auto p-6 flex flex-col gap-6">
+                    <div className="text-center space-y-2 mt-4">
+                        <h1 className="text-3xl font-black text-teal-400 tracking-tighter">PAXSENIX AI</h1>
+                        <p className="text-xs text-slate-400">Text ➔ Image ➔ Video (All-in-One)</p>
+                    </div>
+
+                    <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-xl">
+                        <label className="text-[10px] font-bold text-teal-500 uppercase">1. Deskripsi Produk</label>
+                        <textarea 
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 mt-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none h-24 placeholder-slate-600"
+                            placeholder="Contoh: Sepatu lari merah futuristik melayang di udara dengan efek petir..."
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                        />
+                        <button 
+                            onClick={generateImage}
+                            disabled={loadingImg || !prompt}
+                            className="w-full mt-4 bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                        >
+                            {loadingImg ? <Loader2 className="animate-spin"/> : <ImageIcon size={18}/>}
+                            {loadingImg ? "SEDANG BIKIN..." : "BUAT GAMBAR"}
+                        </button>
+                    </div>
+
+                    {imgUrl && (
+                        <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 animate-fade-in">
+                            <label className="text-[10px] font-bold text-teal-500 uppercase mb-2 block">2. Hasil Gambar</label>
+                            <img src={imgUrl} className="w-full rounded-xl border border-slate-600 shadow-lg mb-4" />
+                            
+                            {!vidUrl && (
+                                <button 
+                                    onClick={generateVideo}
+                                    disabled={loadingVid}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    {loadingVid ? <Loader2 className="animate-spin"/> : <Video size={18}/>}
+                                    {loadingVid ? "RENDERING VIDEO..." : "UBAH JADI VIDEO"}
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {vidUrl && (
+                        <div className="bg-slate-800 p-4 rounded-2xl border border-teal-500/30 shadow-[0_0_20px_rgba(20,184,166,0.2)]">
+                             <label className="text-[10px] font-bold text-teal-500 uppercase mb-2 block">3. Hasil Video Final</label>
+                             <div className="rounded-xl overflow-hidden border border-teal-500/50 relative">
+                                <video src={vidUrl} controls autoPlay loop className="w-full" />
+                             </div>
+                             <a href={vidUrl} target="_blank" className="block w-full text-center bg-teal-500 text-slate-900 font-bold py-3 rounded-xl mt-4">
+                                DOWNLOAD VIDEO
+                             </a>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
